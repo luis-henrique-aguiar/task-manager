@@ -1,33 +1,16 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/luis-henrique-aguiar/task-manager/internal/data"
 )
 
 type application struct {
 	appName string
 	logger  *log.Logger
-}
-
-func (app *application) HealthCheck(w http.ResponseWriter, r *http.Request) {
-    data := map[string]string{
-        "status":  "available",
-        "env":     "development",
-        "version": "1.0.0",
-        "app":     app.appName,
-    }
-
-    app.writeJSON(w, http.StatusOK, data)
-}
-
-func (app *application) writeJSON(w http.ResponseWriter, status int, data interface{}) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
-    if err := json.NewEncoder(w).Encode(data); err != nil {
-        app.logger.Println("Erro ao escrever JSON: ", err)
-    }
+    tasks   *data.TaskModel
 }
 
 func main() {
@@ -37,6 +20,7 @@ func main() {
     app := &application{
         appName: "TaskManagerAPI",
         logger:  logger,
+        tasks:   data.NewTaskModel(),
     }
 
     logger.Println("Servidor iniciado na porta 8080...")

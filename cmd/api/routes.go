@@ -14,6 +14,8 @@ func (app *application) routes() http.Handler {
 	r.Use(middleware.Recoverer)
 
 	r.Get("/health", app.HealthCheck)
+	r.Post("/tasks", app.CreateTaskHandler)
+	r.Get("/tasks", app.ListTasksHandler)
 
 	return r
 }

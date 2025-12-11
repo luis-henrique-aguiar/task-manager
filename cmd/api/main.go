@@ -6,35 +6,47 @@ import (
 	"net/http"
 )
 
-type HealthCheckResponse struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
+type application struct {
+	appName string
+	logger  *log.Logger
+}
+
+func (app *application) HealthCheck(w http.ResponseWriter, r *http.Request) {
+    data := map[string]string{
+        "status":  "available",
+        "env":     "development",
+        "version": "1.0.0",
+        "app":     app.appName,
+    }
+
+    app.writeJSON(w, http.StatusOK, data)
+}
+
+func (app *application) writeJSON(w http.ResponseWriter, status int, data interface{}) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    if err := json.NewEncoder(w).Encode(data); err != nil {
+        app.logger.Println("Erro ao escrever JSON: ", err)
+    }
 }
 
 func main() {
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+    logger := log.Default()
 
-        response := HealthCheckResponse {
-            Status:  "ok",
-            Message: "Servidor rodando liso no Go!",
-        }
+    app := &application{
+        appName: "TaskManagerAPI",
+        logger:  logger,
+    }
 
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusOK)
+    logger.Println("Servidor iniciado na porta 8080...")
 
-        if err := json.NewEncoder(w).Encode(response); err != nil {
-            log.Printf("Erro ao fazer encode: %v", err)
-            http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-        }
-	})
+    srv := &http.Server{
+        Addr: ":8080",
+        Handler: app.routes(),
+    }
 
-    log.Println("Servidor rodando na porta 8080...")
-    if err := http.ListenAndServe(":8080", nil); err != nil {
+    if err := srv.ListenAndServe(); err != nil {
         log.Fatal(err)
     }
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/luis-henrique-aguiar/task-manager/internal/data"
 )
@@ -154,4 +155,40 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	app.writeJSON(w, http.StatusOK, task)
+}
+
+func (app *application) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `jsosn:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+	}
+
+	user := &data.User{
+		Name:  input.Name,
+		Email: strings.ToLower(input.Email),
+	}
+
+	err := user.Password.Set(input.Password)
+	if err != nil {
+		http.Error(w, "Erro ao processar senha", http.StatusInternalServerError)
+		return
+	}
+
+	err = app.users.Insert(user)
+	if err != nil {
+		if errors.Is(err, data.ErrDuplicateEmail) {
+			http.Error(w, "Este email já está em uso", http.StatusConflict)
+		} else {
+			app.logger.Println(err)
+			http.Error(w, "Erro interno", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	app.writeJSON(w, http.StatusCreated, user)
 }

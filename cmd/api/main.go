@@ -24,6 +24,7 @@ type application struct {
     cfg     config
 	logger  *log.Logger
     tasks   *data.TaskModel
+    users   *data.UserModel
 }
 
 func main() {
@@ -66,6 +67,7 @@ func main() {
         appName: "TaskManagerAPI",
         logger:  logger,
         tasks:   data.NewTaskModel(db),
+        users:   &data.UserModel{DB: db},
         cfg:     cfg,
     }
 
@@ -84,6 +86,14 @@ func main() {
 
 func createTable(db *sql.DB, logger *log.Logger) {
     query := `
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash BYTEA NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,

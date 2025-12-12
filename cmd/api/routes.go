@@ -19,6 +19,7 @@ func (app *application) routes() http.Handler {
 	r.Delete("/tasks/{id}", app.DeleteTaskHandler)
 	r.Get("/tasks/{id}", app.GetTaskHandler)
 	r.Put("/tasks/{id}", app.UpdateTaskHandler)
+	r.Post("/users", app.RegisterUserHandler)
 
 	return r
 }

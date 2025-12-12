@@ -41,16 +41,26 @@ func (app *application) CreateTaskHandler(w http.ResponseWriter, r *http.Request
 	task := &data.Task{
 		Title:   input.Title,
 		Content: input.Content,
-		Done:    false,
 	}
 
-	app.tasks.Insert(task)
+	err := app.tasks.Insert(task)
+	if err != nil {
+		app.logger.Println(err)
+		http.Error(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 
 	app.writeJSON(w, http.StatusCreated, task)
 }
 
 func (app *application) ListTasksHandler(w http.ResponseWriter, r *http.Request) {
-	tasks := app.tasks.GetAll()
+	tasks, err := app.tasks.GetAll()
+	if err != nil {
+		app.logger.Println(err)
+		http.Error(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
 	app.writeJSON(w, http.StatusOK, tasks)
 }
 
@@ -92,4 +102,56 @@ func (app *application) DeleteTaskHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	app.writeJSON(w, http.StatusNoContent, map[string]string{"message": "tarefa deletada com sucesso"})
+}
+
+func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		http.Error(w, "ID inválido", http.StatusBadRequest)
+		return
+	}
+
+	task, err := app.tasks.Get(id)
+	if err != nil {
+		if errors.Is(err, data.ErrRecordNotFound) {
+			http.Error(w, "Tarefa não encontrada", http.StatusNotFound)
+		} else {
+			http.Error(w, "Erro interno", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	var input struct {
+		Title   *string `json:"title"`
+		Content *string `json:"content"`
+		Done 	*bool 	`json:"done"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	if input.Title != nil {
+		task.Title = *input.Title
+	}
+	if input.Content != nil {
+		task.Content = *input.Content
+	}
+	if input.Done != nil {
+		task.Done = *input.Done
+	}
+
+	err = app.tasks.Update(task)
+	if err != nil {
+		if errors.Is(err, data.ErrRecordNotFound) {
+			http.Error(w, "Conflito de edição: Tente novamente", http.StatusConflict)
+		} else {
+			app.logger.Println(err)
+			http.Error(w, "Erro interno", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	app.writeJSON(w, http.StatusOK, task)
 }

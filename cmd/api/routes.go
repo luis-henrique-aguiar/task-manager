@@ -18,6 +18,7 @@ func (app *application) routes() http.Handler {
 	r.Get("/tasks", app.ListTasksHandler)
 	r.Delete("/tasks/{id}", app.DeleteTaskHandler)
 	r.Get("/tasks/{id}", app.GetTaskHandler)
+	r.Put("/tasks/{id}", app.UpdateTaskHandler)
 
 	return r
 }

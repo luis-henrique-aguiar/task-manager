@@ -1,8 +1,8 @@
 package data
 
 import (
+	"database/sql"
 	"errors"
-	"sync"
 	"time"
 )
 
@@ -18,67 +18,145 @@ type Task struct {
 }
 
 type TaskModel struct {
-    mu     sync.Mutex
-    tasks  []Task
-    nextID int64
+    DB *sql.DB
+}
+
+func NewTaskModel(db *sql.DB) *TaskModel {
+    return &TaskModel{DB: db}
 }
 
 func (m *TaskModel) Get(id int64) (*Task, error) {
-    m.mu.Lock()
-    defer m.mu.Unlock()
+    query := `
+        SELECT id, created_at, title, content, done, version
+        FROM tasks
+        WHERE id = $1
+    `
 
-    for _, task := range m.tasks {
-        if task.ID == id {
-            return &task, nil
+    var task Task
+
+    err := m.DB.QueryRow(query, id).Scan(
+        &task.ID,
+        &task.CreatedAt,
+        &task.Title,
+        &task.Content,
+        &task.Done,
+        &task.Version,
+    )
+
+    if err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            return nil, ErrRecordNotFound
         }
+        return nil, err
     }
 
-    return nil, ErrRecordNotFound
+    return &task, nil
 }
 
 func (m *TaskModel) Delete(id int64) error {
-    m.mu.Lock()
-    defer m.mu.Unlock()
+    query := `DELETE FROM tasks WHERE id = $1`
 
-    index := -1
-    for i, task := range m.tasks {
-        if task.ID == id {
-            index = i
-            break
-        }
+    result, err := m.DB.Exec(query, id)
+    if err != nil {
+        return err
     }
 
-    if index == -1 {
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        return err
+    }
+
+    if rowsAffected == 0 {
         return ErrRecordNotFound
     }
-
-    m.tasks = append(m.tasks[:index], m.tasks[index+1:]...)
 
     return nil
 }
 
-func NewTaskModel() *TaskModel {
-    return &TaskModel{
-        tasks: []Task{},
-        nextID: 1,
-    }
-}
+func (m *TaskModel) Insert(task *Task) error {
+    query := `
+        INSERT INTO tasks (title, content, done, version, created_at)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+    `
 
-func (m *TaskModel) Insert(task *Task) {
-    m.mu.Lock()
-    defer m.mu.Unlock()
-
-    task.ID = m.nextID
     task.CreatedAt = time.Now()
     task.Version = 1
+    task.Done = false
 
-    m.tasks = append(m.tasks, *task)
-    m.nextID++
+    err := m.DB.QueryRow(
+        query,
+        task.Title,
+        task.Content,
+        task.Done,
+        task.Version,
+        task.CreatedAt,
+    ).Scan(&task.ID)
+    
+    if err != nil {
+        return err
+    }
+
+    return nil
 }
 
-func (m *TaskModel) GetAll() []Task {
-    m.mu.Lock()
-    defer m.mu.Unlock()
+func (m *TaskModel) GetAll() ([]Task, error) {
+    query := `SELECT id, created_at, title, content, done, version FROM tasks`
 
-    return m.tasks
+    rows, err := m.DB.Query(query)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var tasks []Task
+
+    for rows.Next() {
+        var task Task
+        err := rows.Scan(
+            &task.ID,
+            &task.CreatedAt,
+            &task.Title,
+            &task.Content,
+            &task.Done,
+            &task.Version,
+        )
+        if err != nil {
+            return nil, err
+        }
+        tasks = append(tasks, task)
+    }
+
+    if err = rows.Err(); err != nil {
+        return nil, err
+    }
+
+    return tasks, nil
+}
+
+func (m *TaskModel) Update(task *Task) error {
+    query := `
+        UPDATE tasks
+        SET title = $1, content = $2, done = $3, version = version + 1
+        WHERE id = $4 AND version = $5
+        RETURNING version
+    `
+
+    err := m.DB.QueryRow(
+        query,
+        task.Title,
+        task.Content,
+        task.Done,
+        task.ID,
+        task.Version,
+    ).Scan(&task.Version)
+
+    if err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            return ErrRecordNotFound
+        }
+        return err
+    }
+
+    return nil
 }

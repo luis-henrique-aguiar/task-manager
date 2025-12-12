@@ -16,6 +16,8 @@ func (app *application) routes() http.Handler {
 	r.Get("/health", app.HealthCheck)
 	r.Post("/tasks", app.CreateTaskHandler)
 	r.Get("/tasks", app.ListTasksHandler)
+	r.Delete("/tasks/{id}", app.DeleteTaskHandler)
+	r.Get("/tasks/{id}", app.GetTaskHandler)
 
 	return r
 }

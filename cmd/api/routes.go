@@ -20,6 +20,7 @@ func (app *application) routes() http.Handler {
 	r.Get("/tasks/{id}", app.GetTaskHandler)
 	r.Put("/tasks/{id}", app.UpdateTaskHandler)
 	r.Post("/users", app.RegisterUserHandler)
+	r.Post("/users/login", app.LoginUserHandler)
 
 	return r
 }

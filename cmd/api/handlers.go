@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/luis-henrique-aguiar/task-manager/internal/data"
 )
 
@@ -191,4 +194,59 @@ func (app *application) RegisterUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	app.writeJSON(w, http.StatusCreated, user)
+}
+
+func (app *application) LoginUserHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	user, err := app.users.GetByEmail(strings.ToLower(input.Email))
+	if err != nil {
+		if errors.Is(err, data.ErrRecordNotFound) {
+			http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
+		} else {
+			app.logger.Println(err)
+			http.Error(w, "Error interno", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	matches, err := user.Password.Matches(input.Password)
+	if err != nil {
+		app.logger.Println(err)
+		http.Error(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	if !matches {
+		http.Error(w, "Credenciais inválidas", http.StatusUnauthorized)
+		return
+	}
+
+	claims := jwt.MapClaims{
+		"sub": user.ID,
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
+		"iss": "task-manager-api",
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	secret := []byte(os.Getenv("JWT_SECRET"))
+	tokenString, err := token.SignedString(secret)
+	if err != nil {
+		app.logger.Println("Erro ao assinar token:", err)
+		http.Error(w, "Erro interno ao gerar token", http.StatusInternalServerError)
+		return
+	}
+
+	app.writeJSON(w, http.StatusOK, map[string]string{
+		"token": tokenString,
+	})
 }

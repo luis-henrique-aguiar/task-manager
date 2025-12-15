@@ -14,13 +14,18 @@ func (app *application) routes() http.Handler {
 	r.Use(middleware.Recoverer)
 
 	r.Get("/health", app.HealthCheck)
-	r.Post("/tasks", app.CreateTaskHandler)
-	r.Get("/tasks", app.ListTasksHandler)
-	r.Delete("/tasks/{id}", app.DeleteTaskHandler)
-	r.Get("/tasks/{id}", app.GetTaskHandler)
-	r.Put("/tasks/{id}", app.UpdateTaskHandler)
 	r.Post("/users", app.RegisterUserHandler)
 	r.Post("/users/login", app.LoginUserHandler)
+
+	r.Group(func(r chi.Router) {
+		r.Use(app.Authenticate)
+
+		r.Post("/tasks", app.CreateTaskHandler)
+		r.Get("/tasks", app.ListTasksHandler)
+		r.Delete("/tasks/{id}", app.DeleteTaskHandler)
+		r.Get("/tasks/{id}", app.GetTaskHandler)
+		r.Put("/tasks/{id}", app.UpdateTaskHandler)
+	})
 
 	return r
 }

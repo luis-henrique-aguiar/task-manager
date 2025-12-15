@@ -65,6 +65,14 @@ func (app *application) ListTasksHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	userID, ok := app.ContextGetUser(r)
+	if !ok {
+		http.Error(w, "Erro ao recuperar usuário", http.StatusInternalServerError)
+		return
+	}
+
+	app.logger.Printf("O usuário %d está listando tarefas!", userID)
+
 	app.writeJSON(w, http.StatusOK, tasks)
 }
 
@@ -128,7 +136,7 @@ func (app *application) UpdateTaskHandler(w http.ResponseWriter, r *http.Request
 	var input struct {
 		Title   *string `json:"title"`
 		Content *string `json:"content"`
-		Done 	*bool 	`json:"done"`
+		Done 	  *bool 	`json:"done"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -164,7 +172,7 @@ func (app *application) RegisterUserHandler(w http.ResponseWriter, r *http.Reque
 	var input struct {
 		Name     string `json:"name"`
 		Email    string `json:"email"`
-		Password string `jsosn:"password"`
+		Password string `json:"password"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
